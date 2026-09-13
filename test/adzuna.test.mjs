@@ -232,6 +232,25 @@ test('fetch rejects missing or invalid country before making a request', async (
   assert.equal(requests, 0);
 });
 
+test('fetch rejects invalid max_days_old before making a request', async () => {
+  let requests = 0;
+  const ctx = {
+    env: Object.freeze({ ADZUNA_APP_ID: 'id', ADZUNA_APP_KEY: 'key' }),
+    fetchJson: async () => {
+      requests += 1;
+      return { results: [] };
+    },
+  };
+
+  for (const maxDaysOld of [0, 'recent']) {
+    await assert.rejects(
+      adzuna.provider.fetch({ country: 'us', max_days_old: maxDaysOld }, ctx),
+      /adzuna: max_days_old must be a positive integer/,
+    );
+  }
+  assert.equal(requests, 0);
+});
+
 test('fetch rejects a malformed API response', async () => {
   const ctx = {
     env: Object.freeze({ ADZUNA_APP_ID: 'id', ADZUNA_APP_KEY: 'key' }),

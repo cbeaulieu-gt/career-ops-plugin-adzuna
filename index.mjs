@@ -2,12 +2,14 @@
 
 const API_ROOT = 'https://api.adzuna.com/v1/api';
 
+/** Parses a bounded positive integer, falling back when the value is invalid. */
 function positiveInteger(value, fallback, maximum) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) return fallback;
   return Math.min(parsed, maximum);
 }
 
+/** Returns the normalized two-letter country code required by Adzuna. */
 function requiredCountry(entry) {
   const country = typeof entry?.country === 'string' ? entry.country.trim().toLowerCase() : '';
   if (!/^[a-z]{2}$/.test(country)) {
@@ -16,6 +18,7 @@ function requiredCountry(entry) {
   return country;
 }
 
+/** Reports whether a value is an HTTP(S) job URL. */
 function validJobUrl(value) {
   try {
     const url = new URL(String(value));
@@ -25,6 +28,7 @@ function validJobUrl(value) {
   }
 }
 
+/** Converts an Adzuna result into the Career-Ops job shape. */
 function normalizeResult(result) {
   if (!result || typeof result !== 'object') return null;
   const id = result.id == null ? '' : String(result.id).trim();
@@ -45,6 +49,17 @@ function normalizeResult(result) {
   return job;
 }
 
+/** Validates and returns max_days_old, or null when it is absent. */
+function optionalMaxDaysOld(entry) {
+  if (!Object.prototype.hasOwnProperty.call(entry, 'max_days_old')) return null;
+  const parsed = Number(entry.max_days_old);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error('adzuna: max_days_old must be a positive integer');
+  }
+  return Math.min(parsed, Number.MAX_SAFE_INTEGER);
+}
+
+/** Builds an authenticated Adzuna search URL for one result page. */
 function searchUrl(entry, country, page, appId, appKey, resultsPerPage) {
   const url = new URL(`${API_ROOT}/jobs/${country}/search/${page}`);
   url.searchParams.set('app_id', appId);
@@ -57,12 +72,13 @@ function searchUrl(entry, country, page, appId, appKey, resultsPerPage) {
   const where = typeof whereValue === 'string' ? whereValue.trim() : '';
   if (what) url.searchParams.set('what', what);
   if (where) url.searchParams.set('where', where);
-  const maxDaysOld = positiveInteger(entry.max_days_old, null, Number.MAX_SAFE_INTEGER);
+  const maxDaysOld = optionalMaxDaysOld(entry);
   if (maxDaysOld !== null) url.searchParams.set('max_days_old', String(maxDaysOld));
   url.searchParams.set('content-type', 'application/json');
   return url;
 }
 
+/** Fetches a page while redacting credentials from upstream errors. */
 async function fetchPage(ctx, url, secrets) {
   try {
     return await ctx.fetchJson(url);
