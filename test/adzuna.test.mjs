@@ -1,8 +1,14 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import assertModule from 'node:assert';
 import { readFile } from 'node:fs/promises';
 
 import adzuna from '../index.mjs';
+
+const assert = assertModule.strict;
+const tests = [];
+
+function test(name, fn) {
+  tests.push({ name, fn });
+}
 
 test('manifest declares the keyed provider security boundary', async () => {
   const manifestUrl = new URL('../manifest.json', import.meta.url);
@@ -264,3 +270,13 @@ test('fetch enforces the twenty-page safety ceiling', async () => {
   assert.equal(paths.at(-1), '/v1/api/jobs/nz/search/20');
   assert.equal(jobs.length, 20);
 });
+
+for (const { name, fn } of tests) {
+  const cleanups = [];
+  try {
+    await fn({ after: (cleanup) => cleanups.push(cleanup) });
+    console.log(`✓ ${name}`);
+  } finally {
+    for (const cleanup of cleanups.reverse()) cleanup();
+  }
+}
